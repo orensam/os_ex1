@@ -1,0 +1,33 @@
+CC=g++
+RANLIB=ranlib
+
+SRC = measure.c 
+OBJ = $(SRC:.c=.o)
+
+LIB_CSRC=$(filter-out measure.c, $(wildcard *.c))
+LIB_CCSRC=$(wildcard *.cc)
+LIB_CPPSRC=$(wildcard *.cpp)
+LIBSRC = $(LIB_CSRC) $(LIB_CCSRC) $(LIB_CPPSRC)
+LIBOBJ=$(LIB_CSRC:.c=.o) $(LIB_CCSRC:.cc=.o) $(LIB_CPPSRC:.cpp=.o)
+
+INCS=-I.
+CFLAGS = -Wall -g $(INCS)
+LOADLIBES = -L./ -lm
+
+OSMLIB = libosm.a
+TARGETS = measure
+
+all: $(TARGETS) 
+
+$(TARGETS): $(OBJ) $(OSMLIB)
+
+$(OSMLIB): $(LIBOBJ)
+	$(AR) $(ARFLAGS) $@ $^
+	$(RANLIB) $@
+
+clean:
+	$(RM) $(TARGETS) $(OSMLIB) $(OBJ) $(LIBOBJ) *~ *core
+
+depend:
+	makedepend -- $(CFLAGS) -- $(SRC) $(LIBSRC)
+

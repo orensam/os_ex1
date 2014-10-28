@@ -1,0 +1,25 @@
+Running
+-------
+
+Running the tester creates a ./tmp directory at the location of the tester:
+
+  ./tester.py <tar file>
+
+If you want to change the files in ./tmp and test them again without tar'ing them, use:
+
+  ./tester.py -t
+
+You can compare actual numbers by running the school solution executable ./sol/measure
+
+Important Notes
+---------------
+
+This is a specific version of the tester. If you are going to resubmit, know that some numbers
+will be changed, and tests added. Also note that in resubmissions, your code will be reviewed
+thoroughly and you can lose more points.
+
+Also note that whenever an error is detected by the tester, it is only reduced after reviewing
+the code, so you might see some errors that didn't actually appear in your grades.
+
+If your changes to the code somehow affect these issues (i.e. make them worse), these points
+MAY BE REDUCED in the resubmission grading, so be careful!

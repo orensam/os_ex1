@@ -1,0 +1,235 @@
+orensam
+yoniherzog
+
+================
+=== OS - Ex1 ===
+================
+
+Oren Samuel ID 200170694
+Yoni Herzog ID 200299956
+
+=== Pt. I ===
+-------------
+
+Generally speaking, the program does these operations:
+
+If a single argument <arg> is given, the program creates a new directory named os2014D,
+creates a file within it, named os2014F, and writes into the file a string made up from
+110 spaces, the current username, a linebreak, and then <arg>. Then, the file is deleted,
+and finally the directory is deleted. The program exits with exit status 0.
+
+If an invalid amount of arguments is given (zero, or more than one), the program writes
+into stderr: "Only a single argument is supported", the a newline, and then ": Success".
+The program exits with exit status 0.
+
+The systems called involved (as instructed in the ex description, we only looked at the calls made
+after the munmap which comes after the last mprotect):
+
+=== When a single argument is given: ===
+
+1. mkdir("os2014D", 0775)            = 0
+Creates a new directory named os2014D, with permissions rwxrwxr-x. Return value 0 implies success.
+
+2. brk(0)                            = 0x78b000
+3. brk(0x7ac000)                     = 0x7ac000
+
+brk changes the program break, i.e the end of the process's data segment (heap).
+These two calls are (probably) the result of a malloc() command in the program.  
+When calling brk with an invalid address (as done here - the end of a process's 
+data segment cannot be zero), the location of the current break is returned 
+(this is specific to the linux implemenataion, as opposed to the glibc wrapper implementation).
+Then the program break is set to address 0x7ac000, which you can notice is the current one
+plus 0x21000=135168 bytes. This means that the program allocated 0x21000 bytes of memory.
+
+(Clarification - the programmer might have used these two commands directly, or ran a command
+different from malloc() which compiled into these system calls. 
+But we created a program ourselves, which only performed a simple malloc(), 
+and got the same result). 
+
+4. open("os2014D/os2014F", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
+Opens the file os2014D/os2014F for writing (only), and if the file does not exist
+it will be created. The flags 666 were used, i.e rw-rw-rw-.  
+The file descriptor 3 is returned.
+
+5. fstat(3, {st_dev=makedev(0, 40), st_ino=22228767, st_mode=S_IFREG|0644, st_nlink=1,
+st_uid=362194, st_gid=40, st_blksize=65536, st_blocks=0, st_size=0, st_atime=2014/02/25-09:53:58,
+st_mtime=2014/02/25-09:53:58, st_ctime=2014/02/25-09:53:58}) = 0
+fstat is used to get the status of a file. In this case, the file with file descriptor 3,
+i.e the file we opened/created in the previous line.
+The command fills the given struct with information about the file status (e.g  user id of owner,
+size, access and modification times etc.). A return value of 0 implies command success.
+
+6. mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f9d9265a000
+Maps 65536 bytes anonymously, i.e maps an area of the process's virtual memory 
+not backed by any file. The contents is initialized to zero. 
+In other words, this is just a memory allocation of size 65536.
+Read and write permissions are given. file descriptor -1, the default offset 0, 
+and the MAP_PRIVATE flag are part of the fact that this is an anonymous allocation, i.e 
+not an allocation of a file.
+Return value is the start address of the alloacted memory.
+
+7. write(3, "[SPACES]orensam\nhellosjkbfgskrfgbk", 136) = 136
+Writes into the opened file (which has file descriptor 3) 110 spaces, then the username,
+a new line, then the value inputted to the program. 136 is the length of the 
+buffer to be written, and return value of the same size indicates that exactly that amount (136
+bytes) was written.
+
+8. close(3)                          = 0
+Closes the file with file descriptor 3, i.e the file we opened and wrote into.
+
+9. munmap(0x7f9d9265a000, 65536)     = 0
+Unmaps (deallocates) the memory allocated by mmap 3 commands ago,
+at address 0x7f9d9265a000 and size 65536. 
+Return value 0 implies success.
+
+10. unlink("os2014D/os2014F")         = 0
+From the man: unlink() deletes a name from the file system.
+If that name was the last link to a file and no processes have the file open the file is deleted.
+This means that the file we created is unlinked from the name os2014D/os2014F on the file system,
+and under the probable assumption that no other links were made to the file, it is deleted.
+Return value 0 implies success.
+
+11.  rmdir("os2014D")                  = 0
+Removes the directory os2014D that was previously created.
+Return value 0 implies success.
+
+12. exit_group(0)                     = ?
+Exits all threads (in our case, one thread) with status 0.
+No return value since this exits the program.
+ 
+=== When a an invalid number (0 or more than 1) of arguments is given  ===
+
+1. dup(2)                            = 3
+Duplicates the file descriptor 2 (stderr), and returns the new file descriptor, 3, which it was
+duplicated into.
+
+2. fcntl(3, F_GETFL)                 = 0x8002 (flags O_RDWR|O_LARGEFILE)
+fcntl is used to manipulate file descriptor.
+In this case, with parameter F_GETFL, it is only used for getting the file access mode and 
+the file status (for file descriptor 3 which refers now to stderr).
+The return value 0x8002, as explained in the strace output, implies that the file is available
+for read/write and that it is marked as a large file (as you'd expect for a file descriptor which 
+refers to a system stream).
+
+3. brk(0)                            = 0xa51000
+4. brk(0xa72000)                     = 0xa72000
+Excatly like lines 2-3 in the previous section.
+
+5. fstat(3, {st_dev=makedev(0, 10), st_ino=3, st_mode=S_IFCHR|0620, st_nlink=1, st_uid=362194, 
+st_gid=4, st_blksize=1024, st_blocks=0, st_rdev=makedev(136, 0), st_atime=2014/02/25-11:01:04,
+st_mtime=2014/02/25-11:01:04, st_ctime=2014/02/25-09:11:21}) = 0
+Exactly like line 5 in the previous section.
+
+6. mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f3410c52000
+Exactly like line 6 from the previous section, only with a different size (4096) and
+of course a different address is returned.
+
+7. lseek(3, 0, SEEK_CUR)             = -1 ESPIPE (Illegal seek)
+lseek tries to reposition the read/write offset for file descriptor 3 (i.e stderr)
+- offset=0 and whence=SEEK_CUR imply that we try to reposition to the current offset plus 0 bytes,
+i.e exactly the current offset.
+Since 3 refers to stderr, which is not an actual file, but a pipe, the error message ESPIPE
+is invoked, and the error value -1 is returned.
+
+8.  write(3, "Only a single argument is supported\n", 36) = 36
+9.  write(3, ": Success\n", 10)       = 10
+Writes into file descriptor 3, i.e stderr, the two lines:
+Only a single argument is supported\n
+: Success\n"
+The respective return values (36, 10) imply that both writes were successful
+(since we tried to write 10 and 36 bytes and all of them were written)
+
+10.  close(3)                          = 0
+Closes file descriptor 3, which references stderr.
+Now, this file descriptor no longer refers to stderr.
+
+11.  munmap(0x7f3410c52000, 4096)      = 0
+Like the previous section, but with size 4096.
+
+12  exit_group(0)                     = ?
+Like the previous section.
+
+
+
+=== Pt. II ===
+--------------
+
+
+= General =
+osm.h and osm.c can be compiled into a static library libosm, that can be included in a user's code.
+osm_function_time, osm_syscall_time and osm_operation_time are functions that the user can use
+in order to measure the time, in nanoseconds, it takes the system to complete an empty function
+call, an empty syscall (trap), and a simple instruction operation (in our case, integer addition),
+respectively.
+On top of these, the function measureTimes allows the user to run all these tests combined,
+and receive a struct containing them along with information about number of iterations, hostname,
+and timing ratios. Note that it is the user's responsibility to free the memory allocated for
+the machineName field in the returned struct.
+
+= Iteration =
+When running these functions, the user specifies the number of iterations he would like to perform
+in order to measure the requested values. In order to optimize speed (in expense of the program's
+binary size), loop unrolling was used - the actual number of iterations we perform in each
+measuring function is smaller by approximately a factor of UNROLL_FACTOR (defined in osm.c),
+in each iteration exactly UNROLL_FACTOR executions of the wanted operations are performed
+(note that the number of iterations that the user requested is rounded up to the closest number
+divisible by UNROLL_FACTOR, as specified in the ex description).
+If the user requests an invalid number of iterations, the value defaults to DEFAULT_ITERS
+(set to 50,000 as in the ex specs).
+Note that in order to make our code cleaner, we used the macro ROLL_LOOP(X) which executes X
+20 times (this number has to be manually changed when to UNROLL_FACTOR when it changes, in order
+to ensure accurate results). This means that changing the unroll factor in our program constitutes
+only of changing these two macros (ROLL_LOOP and UNROLL_FACTOR), and no further changes have to be
+done in the measure functions' bodies.
+
+= Measuring =
+To calculate each operation's time, we get the current time using gettimeofday(),
+run the desired number of iteration (with loop unrolling as described before), and then get the
+end time using gettimeofday() again. The times are subtracted from each other, and then divided
+by the number of actual iterations performed, to receive the time it takes an atomic operation
+to run on the system.
+
+Since the act of performing a for-loop has a running time of its own, one cannot really know
+the time it takes to perform X atomic operations by iterating X times and performing the atomic
+operation every time.
+So, to minimize the looping overhead, in addition to performing loop unrolling, we subtract
+a loopOverhead factor from the total running time of each measuring loop. This overhead is
+calculated by measuring the running time of an empty loop with the same number of iterations as
+the atomic-operation-measuring loop. This helps us get a measurement that is closer to reality. 
+
+osm_function_time(): In order to measure an empty function call, we created the following empty 
+function: void __attribute__ ((noinline)) emptyFunc().
+Note the noinline attribute, which (hopefully) prevents the compiler from inlining the function,
+meaning that it will actually be called when looping through, and we will actually measure the time
+it takes a function call.
+
+osm_syscall_time(): In each iteration, an empty system call OSM_NULLSYSCALL was performed.
+This should give a good approximation of the time it takes to perform a trap.
+
+osm_operation_time(): In each iteration, we performed the operation:
+j = i + 1. This calculation consists of one variable access, one addition, and one assignment.
+to calculate the overhead, we used the function getSpecialLoopOverhead() 
+which performs the operation j=i, which consists of one access and one assignment.
+This should give us a good approximation for the time it takes to perform one addition operation.
+
+measureTimes(): Calls the three time measurement methods and inputs their data and the relevant 
+ratios into the output struct in addition to the requested hostname and number of iterations.
+
+=== Compilation ===
+The library is compiled with the flag -O0, in order to avoid compiler optimizations
+which might hurt our measurements.
+
+=== Example measurements on aquarium machines ===
+
+Host: oct-29; Iteration count: 50000
+Empty function call: 1.540000
+Simple addition: 0.280000
+Empty syscall: 253.860000
+Function to Instruction ratio: 5.500000
+Syscall to instruction ratio: 906.642857
+
+These measurements are in accordance with the expectations the ex definition describes.
+
+=== Notes ====
+In the code there is some code repetition which could have been avoided using macros and such, but 
+we've decided for the sake of readability to leave it as it is. 
